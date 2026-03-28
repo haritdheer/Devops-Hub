@@ -103,10 +103,10 @@ export function AppLayout() {
           <p className="text-xs text-white-600">
             Made with ❤️ by <span className="text-white-600 font-medium">Blitzkrieg Team</span>
           </p>
-          <span className="text-slate-700 text-xs hidden sm:inline">·</span>
+          <span className="text-slate-700 text-xs">·</span>
           <button
             onClick={handleTeamClick}
-            className="text-xs text-cyan-500/70 hover:text-cyan-400 transition-colors underline underline-offset-2 decoration-dotted hidden sm:inline"
+            className="text-xs text-cyan-500/70 hover:text-cyan-400 transition-colors underline underline-offset-2 decoration-dotted"
           >
             Learn more on Dashboard ↗
           </button>
