@@ -12,7 +12,7 @@ import { clsx } from 'clsx';
 
 const iconComponents: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
   FileCode2, Braces, Key, Clock, Binary, Container,
-  Layers, GitCompare, ArrowLeftRight, ScrollText,
+  Layers, GitCompare, ArrowLeftRight, ScrollText, Zap,
 };
 
 // ─── Animated counter hook ────────────────────────────────────────────────────
@@ -73,10 +73,10 @@ const CATEGORIES = [
     stackColor: 'bg-green-500',
   },
   {
-    id: 'inspection', label: 'Inspection', count: 3, total: 10,
-    bar: 'bg-cyan-500', glow: 'shadow-cyan-500/30',
+    id: 'inspection', label: 'Inspection', count: 4, total: 10,
+    bar: 'bg-cyan-500', glow: 'shadow-cyan-500/40',
     card: 'from-cyan-500/20 to-blue-500/10', border: 'border-cyan-500/20',
-    text: 'text-cyan-400', description: 'JWT, Docker, Kubernetes inspection',
+    text: 'text-cyan-400', description: 'JWT, API Tester, Docker, Kubernetes inspection',
     stackColor: 'bg-cyan-500',
   },
   {
