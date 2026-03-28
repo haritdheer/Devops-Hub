@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Settings, Trash2, CheckCircle2, Info, Database, Palette, Keyboard } from 'lucide-react';
+import { Settings, Trash2, CheckCircle2, Info, Database, Keyboard } from 'lucide-react';
 import { clsx } from 'clsx';
 import { toolRegistry } from '../../plugins/registry';
+import { useAppStore } from '../../app/store';
 
 function clearAll() {
   toolRegistry.forEach((tool) => {
@@ -62,9 +63,13 @@ export function SettingsPage() {
   const [cleared, setCleared] = useState(false);
   const [persistence, setPersistence] = useState(true);
   const [animations, setAnimations] = useState(true);
+  const [activeSection, setActiveSection] = useState('general');
+
+  const { recentTools, clearRecentTools } = useAppStore();
 
   const handleClearAll = () => {
     clearAll();
+    clearRecentTools();
     setCleared(true);
     setTimeout(() => setCleared(false), 2500);
   };
@@ -76,11 +81,8 @@ export function SettingsPage() {
   const sections = [
     { id: 'general', label: 'General', icon: Settings },
     { id: 'storage', label: 'Storage', icon: Database },
-    { id: 'appearance', label: 'Appearance', icon: Palette },
     { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
   ];
-
-  const [activeSection, setActiveSection] = useState('general');
 
   return (
     <div className="flex flex-col md:flex-row h-full">
@@ -113,8 +115,9 @@ export function SettingsPage() {
           initial={{ opacity: 0, x: 8 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.2 }}
-          className="space-y-2"
+          className="space-y-4"
         >
+          {/* General */}
           {activeSection === 'general' && (
             <div className="glass-card overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-700/40">
@@ -123,7 +126,7 @@ export function SettingsPage() {
               <div className="px-5">
                 <SettingRow
                   label="Persist editor inputs"
-                  description="Automatically save your last input for each tool"
+                  description="Automatically save your last input for each tool to localStorage"
                 >
                   <Toggle value={persistence} onChange={setPersistence} />
                 </SettingRow>
@@ -145,6 +148,7 @@ export function SettingsPage() {
             </div>
           )}
 
+          {/* Storage */}
           {activeSection === 'storage' && (
             <div className="space-y-4">
               <div className="glass-card overflow-hidden">
@@ -161,7 +165,9 @@ export function SettingsPage() {
 
                   {toolsWithData.length > 0 ? (
                     <div>
-                      <p className="text-xs text-slate-500 mb-2">{toolsWithData.length} tool{toolsWithData.length !== 1 ? 's' : ''} with saved data</p>
+                      <p className="text-xs text-slate-500 mb-2">
+                        {toolsWithData.length} tool{toolsWithData.length !== 1 ? 's' : ''} with saved data
+                      </p>
                       <div className="space-y-1">
                         {toolsWithData.map((tool) => {
                           const val = localStorage.getItem(tool.persistenceKey) || '';
@@ -179,6 +185,24 @@ export function SettingsPage() {
                   )}
                 </div>
               </div>
+
+              {recentTools && recentTools.length > 0 && (
+                <div className="glass-card overflow-hidden">
+                  <div className="px-5 py-4 border-b border-slate-700/40">
+                    <p className="text-sm font-semibold text-white">Recent Tools</p>
+                  </div>
+                  <div className="p-5 space-y-1">
+                    {recentTools.map((id) => {
+                      const tool = toolRegistry.find((t) => t.id === id);
+                      return tool ? (
+                        <div key={id} className="px-3 py-2 rounded-lg bg-slate-800/30 text-xs text-slate-400">
+                          {tool.name}
+                        </div>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div className="glass-card p-5">
                 <p className="text-sm font-semibold text-white mb-1">Clear All Data</p>
@@ -201,58 +225,7 @@ export function SettingsPage() {
             </div>
           )}
 
-          {activeSection === 'appearance' && (
-            <div className="glass-card overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-700/40">
-                <p className="text-sm font-semibold text-white">Appearance</p>
-              </div>
-              <div className="px-5">
-                <SettingRow
-                  label="Theme"
-                  description="Interface color theme"
-                >
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700/50 text-xs text-slate-400">
-                    <div className="w-3 h-3 rounded-full bg-slate-950 border border-slate-600" />
-                    Dark (default)
-                  </div>
-                </SettingRow>
-                <SettingRow
-                  label="Accent color"
-                  description="Primary highlight color across the UI"
-                >
-                  <div className="flex items-center gap-2">
-                    {['cyan', 'violet', 'blue', 'green'].map((color) => (
-                      <button
-                        key={color}
-                        className={clsx(
-                          'w-5 h-5 rounded-full border-2 transition-all',
-                          color === 'cyan'
-                            ? 'bg-cyan-500 border-cyan-400 ring-2 ring-cyan-500/30'
-                            : color === 'violet'
-                            ? 'bg-violet-500 border-violet-400'
-                            : color === 'blue'
-                            ? 'bg-blue-500 border-blue-400'
-                            : 'bg-green-500 border-green-400'
-                        )}
-                      />
-                    ))}
-                  </div>
-                </SettingRow>
-                <SettingRow
-                  label="Font size"
-                  description="Editor and code panel font size"
-                >
-                  <select className="text-xs px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700/50 text-slate-400 focus:outline-none cursor-pointer">
-                    <option>12px</option>
-                    <option selected>13px</option>
-                    <option>14px</option>
-                    <option>16px</option>
-                  </select>
-                </SettingRow>
-              </div>
-            </div>
-          )}
-
+          {/* Shortcuts */}
           {activeSection === 'shortcuts' && (
             <div className="glass-card overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-700/40">

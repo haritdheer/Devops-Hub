@@ -6,6 +6,7 @@ interface AppState {
   recentTools: string[];
   toggleSidebar: () => void;
   addRecentTool: (toolId: string) => void;
+  clearRecentTools: () => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -19,6 +20,7 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           recentTools: [toolId, ...state.recentTools.filter((id) => id !== toolId)].slice(0, 5),
         })),
+      clearRecentTools: () => set({ recentTools: [] }),
     }),
     { name: 'devops-hub-app' }
   )
