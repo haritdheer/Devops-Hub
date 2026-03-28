@@ -147,15 +147,6 @@ All parsing logic lives in `src/lib/` as **pure TypeScript functions** — compl
 
 ---
 
-## 🎨 Design System
-
-- **Theme:** Near-black slate background with translucent glassmorphism surfaces
-- **Accents:** Cyan · Blue · Violet · Green · Orange
-- **Utilities:** `.glass`, `.glass-card`, `.text-gradient` defined in `src/index.css`
-- **Animations:** Framer Motion — stagger cards, count-up numbers, animated progress bars, smooth page transitions
-- **Typography:** System UI / Inter, monospace for code panels
-
----
 
 ## 🛠️ Tech Stack
 
