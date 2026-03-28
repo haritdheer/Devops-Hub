@@ -19,10 +19,10 @@ interface SettingRowProps {
 
 function SettingRow({ label, description, children }: SettingRowProps) {
   return (
-    <div className="flex items-center justify-between py-4 border-b border-slate-700/30 last:border-0">
-      <div className="mr-8">
+    <div className="flex items-center justify-between py-4 border-b border-slate-700/30 last:border-0 gap-4">
+      <div className="min-w-0">
         <p className="text-sm font-medium text-white">{label}</p>
-        <p className="text-xs text-slate-500 mt-0.5">{description}</p>
+        <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{description}</p>
       </div>
       <div className="flex-shrink-0">{children}</div>
     </div>
@@ -83,17 +83,17 @@ export function SettingsPage() {
   const [activeSection, setActiveSection] = useState('general');
 
   return (
-    <div className="flex h-full">
-      {/* Sidebar nav */}
-      <div className="w-48 border-r border-slate-700/50 p-4 flex-shrink-0">
-        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-3">Settings</p>
-        <nav className="space-y-1">
+    <div className="flex flex-col md:flex-row h-full">
+      {/* Sidebar nav — horizontal tabs on mobile, vertical sidebar on desktop */}
+      <div className="md:w-48 md:border-r border-b md:border-b-0 border-slate-700/50 md:p-4 flex-shrink-0">
+        <p className="hidden md:block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-3">Settings</p>
+        <nav className="flex md:flex-col md:space-y-1 overflow-x-auto scrollbar-none px-3 md:px-0 py-2 md:py-0 gap-1 md:gap-0">
           {sections.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setActiveSection(id)}
               className={clsx(
-                'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-left transition-colors',
+                'flex-shrink-0 flex items-center gap-2 md:gap-2.5 px-3 py-2 rounded-lg text-sm text-left transition-colors whitespace-nowrap',
                 activeSection === id
                   ? 'bg-slate-700/60 text-white'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
@@ -107,7 +107,7 @@ export function SettingsPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-6 max-w-2xl">
+      <div className="flex-1 overflow-auto p-4 md:p-6 max-w-2xl">
         <motion.div
           key={activeSection}
           initial={{ opacity: 0, x: 8 }}
