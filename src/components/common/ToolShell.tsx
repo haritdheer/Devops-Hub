@@ -11,7 +11,7 @@ export function ToolShell({ children }: ToolShellProps) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className="h-full flex flex-col p-6 gap-4"
+      className="h-full flex flex-col p-3 md:p-6 gap-3 md:gap-4"
     >
       {children}
     </motion.div>

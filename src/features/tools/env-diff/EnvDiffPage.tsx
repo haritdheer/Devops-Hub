@@ -119,12 +119,12 @@ export function EnvDiffPage() {
       )}
 
       {/* Two editors */}
-      <div className="flex gap-4 flex-shrink-0" style={{ height: '220px' }}>
+      <div className="flex flex-col md:flex-row gap-4 flex-shrink-0">
         {[
           { label: '.env (Left / Base)', value: left, onChange: setLeft, hint: 'e.g. production' },
           { label: '.env (Right / Compare)', value: right, onChange: setRight, hint: 'e.g. staging' },
         ].map(({ label, value, onChange, hint }) => (
-          <div key={label} className="flex-1 flex flex-col glass-card overflow-hidden">
+          <div key={label} className="flex-1 flex flex-col glass-card overflow-hidden h-40 md:h-56">
             <div className="px-4 py-2 border-b border-slate-700/40 flex-shrink-0">
               <p className="text-xs font-medium text-slate-400">{label}</p>
               <p className="text-xs text-slate-700">{hint}</p>

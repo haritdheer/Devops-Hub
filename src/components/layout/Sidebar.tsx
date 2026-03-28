@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Zap,
+  X,
 } from 'lucide-react';
 import { useAppStore } from '../../app/store';
 import { clsx } from 'clsx';
@@ -67,12 +68,16 @@ const navItems: NavItem[] = [
   { label: 'Settings', icon: 'Settings', path: '/settings', color: 'text-slate-400' },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  onClose?: () => void;
+}
+
+export function Sidebar({ onClose }: SidebarProps) {
   const { sidebarCollapsed, toggleSidebar } = useAppStore();
 
   return (
     <motion.aside
-      animate={{ width: sidebarCollapsed ? 64 : 240 }}
+      animate={{ width: (onClose || !sidebarCollapsed) ? 240 : 64 }}
       transition={{ duration: 0.2, ease: 'easeInOut' }}
       className="relative flex flex-col h-screen bg-slate-900/80 backdrop-blur-xl border-r border-slate-700/50 flex-shrink-0 overflow-hidden z-20"
     >
@@ -82,19 +87,24 @@ export function Sidebar() {
           <Zap size={16} className="text-white" />
         </div>
         <AnimatePresence>
-          {!sidebarCollapsed && (
+          {(onClose || !sidebarCollapsed) && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
-              className="overflow-hidden"
+              className="overflow-hidden flex-1"
             >
               <p className="text-sm font-bold text-white whitespace-nowrap">DevOps Hub</p>
               <p className="text-xs text-slate-500 whitespace-nowrap">Utility Platform</p>
             </motion.div>
           )}
         </AnimatePresence>
+        {onClose && (
+          <button onClick={onClose} className="ml-auto p-1 text-slate-500 hover:text-slate-300 md:hidden">
+            <X size={16} />
+          </button>
+        )}
       </div>
 
       {/* Nav */}
@@ -104,7 +114,7 @@ export function Sidebar() {
             return (
               <div key={index} className="pt-4 pb-1">
                 <AnimatePresence>
-                  {!sidebarCollapsed && (
+                  {(onClose || !sidebarCollapsed) && (
                     <motion.p
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
@@ -115,7 +125,7 @@ export function Sidebar() {
                     </motion.p>
                   )}
                 </AnimatePresence>
-                {sidebarCollapsed && <div className="h-px bg-slate-700/50 mx-1 mt-1" />}
+                {!onClose && sidebarCollapsed && <div className="h-px bg-slate-700/50 mx-1 mt-1" />}
               </div>
             );
           }
@@ -154,7 +164,7 @@ export function Sidebar() {
                     />
                   )}
                   <AnimatePresence>
-                    {!sidebarCollapsed && (
+                    {(onClose || !sidebarCollapsed) && (
                       <motion.span
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -173,10 +183,10 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Toggle */}
+      {/* Toggle — desktop only */}
       <button
         onClick={toggleSidebar}
-        className="absolute -right-3 top-20 w-6 h-6 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-600 transition-colors z-30"
+        className="absolute -right-3 top-20 w-6 h-6 rounded-full bg-slate-700 border border-slate-600 hidden md:flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-600 transition-colors z-30"
       >
         {sidebarCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
       </button>

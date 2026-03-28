@@ -497,7 +497,7 @@ export function DashboardPage() {
             Validate configs, inspect tokens, test schedules, analyze logs, and parse manifests — all
             in one premium workspace built for engineers.
           </p>
-          <div className="flex gap-3 mt-6">
+          <div className="flex gap-3 mt-6 flex-wrap">
             <Link
               to="/tools/yaml-validator"
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-sm font-medium hover:bg-cyan-500/30 transition-colors"

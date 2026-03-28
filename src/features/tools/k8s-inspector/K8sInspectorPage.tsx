@@ -201,8 +201,8 @@ export function K8sInspectorPage() {
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className="flex flex-col w-2/5 border-r border-slate-700/50">
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+        <div className="flex flex-col md:w-2/5 h-48 md:h-auto border-b border-r-0 md:border-r md:border-b-0 border-slate-700/50">
           <div className="px-4 py-2 border-b border-slate-700/30 flex items-center justify-between">
             <span className="text-xs text-slate-500 font-medium">manifest.yaml</span>
             <span className="text-xs text-slate-600">{input.split('\n').length} lines</span>

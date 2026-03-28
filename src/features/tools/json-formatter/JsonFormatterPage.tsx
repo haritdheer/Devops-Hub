@@ -167,9 +167,9 @@ export function JsonFormatterPage() {
       </div>
 
       {/* Body */}
-      <div className="flex gap-4 flex-1 min-h-0">
+      <div className="flex flex-col md:flex-row gap-4 flex-1 min-h-0">
         {/* Input */}
-        <div className="flex-1 flex flex-col glass-card overflow-hidden">
+        <div className="flex-1 flex flex-col glass-card overflow-hidden min-h-48 md:min-h-0">
           <div className="flex items-center justify-between px-4 py-2 border-b border-slate-700/50 flex-shrink-0">
             <span className="text-xs font-medium text-slate-400">Input</span>
             <span className="text-xs text-slate-600">{input.length} chars</span>
@@ -184,7 +184,7 @@ export function JsonFormatterPage() {
         </div>
 
         {/* Output */}
-        <div className="flex-1 flex flex-col gap-3 min-h-0">
+        <div className="flex-1 flex flex-col gap-3 min-h-48 md:min-h-0">
           {/* Error */}
           {status === 'invalid' && (
             <div className="glass-card p-4 border-red-500/20 bg-red-500/5 flex-shrink-0">
