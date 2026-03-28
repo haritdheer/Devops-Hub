@@ -15,6 +15,9 @@ import {
   FileJson,
   Copy,
   Check,
+  Terminal,
+  Eye,
+  X,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { ToolShell } from '../../../components/common/ToolShell';
@@ -26,7 +29,7 @@ import { useToolPersistence } from '../../../hooks/useToolPersistence';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
 type RequestTab = 'params' | 'headers' | 'body' | 'auth';
-type ResponseTab = 'body' | 'headers';
+type ResponseTab = 'body' | 'headers' | 'preview';
 type BodyType = 'json' | 'text' | 'form';
 type AuthType = 'none' | 'bearer' | 'basic';
 
@@ -131,6 +134,86 @@ function tryPrettyJson(raw: string): string {
     return JSON.stringify(JSON.parse(raw), null, 2);
   } catch {
     return raw;
+  }
+}
+
+interface ParsedCurl {
+  method: HttpMethod;
+  url: string;
+  headers: KVRow[];
+  body: string;
+  bodyType: BodyType;
+}
+
+function parseCurl(cmd: string): ParsedCurl | null {
+  try {
+    // Normalize line continuations and collapse whitespace
+    const normalized = cmd
+      .replace(/\\\n/g, ' ')
+      .replace(/\\\r\n/g, ' ')
+      .trim();
+
+    if (!normalized.toLowerCase().startsWith('curl')) return null;
+
+    // Tokenize respecting quotes
+    const tokens: string[] = [];
+    let current = '';
+    let inSingle = false;
+    let inDouble = false;
+    for (let i = 0; i < normalized.length; i++) {
+      const ch = normalized[i];
+      if (ch === "'" && !inDouble) { inSingle = !inSingle; continue; }
+      if (ch === '"' && !inSingle) { inDouble = !inDouble; continue; }
+      if ((ch === ' ' || ch === '\t') && !inSingle && !inDouble) {
+        if (current) { tokens.push(current); current = ''; }
+      } else {
+        current += ch;
+      }
+    }
+    if (current) tokens.push(current);
+
+    let method: HttpMethod = 'GET';
+    let url = '';
+    const headers: KVRow[] = [];
+    let body = '';
+    let bodyType: BodyType = 'json';
+
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i];
+      if (t === 'curl') continue;
+      if (t === '-X' || t === '--request') {
+        method = (tokens[++i]?.toUpperCase() as HttpMethod) || 'GET';
+      } else if (t === '-H' || t === '--header') {
+        const raw = tokens[++i] || '';
+        const colon = raw.indexOf(':');
+        if (colon > -1) {
+          headers.push({ id: uid(), enabled: true, key: raw.slice(0, colon).trim(), value: raw.slice(colon + 1).trim() });
+        }
+      } else if (t === '-d' || t === '--data' || t === '--data-raw' || t === '--data-binary') {
+        body = tokens[++i] || '';
+        method = method === 'GET' ? 'POST' : method;
+        // Detect form vs json
+        const ct = headers.find((h) => h.key.toLowerCase() === 'content-type')?.value || '';
+        if (ct.includes('x-www-form-urlencoded')) bodyType = 'form';
+        else if (ct.includes('text/plain')) bodyType = 'text';
+        else bodyType = 'json';
+        // Try to pretty print if json
+        body = tryPrettyJson(body);
+      } else if (t === '--form' || t === '-F') {
+        const pair = tokens[++i] || '';
+        body += (body ? '\n' : '') + pair;
+        bodyType = 'form';
+        method = method === 'GET' ? 'POST' : method;
+      } else if (!t.startsWith('-')) {
+        // URL
+        url = t;
+      }
+    }
+
+    if (!url) return null;
+    return { method, url, headers, body, bodyType };
+  } catch {
+    return null;
   }
 }
 
@@ -242,6 +325,11 @@ export function ApiTesterPage() {
   // History
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // cURL import
+  const [curlOpen, setCurlOpen] = useState(false);
+  const [curlInput, setCurlInput] = useState('');
+  const [curlError, setCurlError] = useState('');
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -379,6 +467,22 @@ export function ApiTesterPage() {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendRequest();
   }, [sendRequest]);
 
+  const importCurl = useCallback(() => {
+    const parsed = parseCurl(curlInput.trim());
+    if (!parsed) { setCurlError('Could not parse cURL command. Make sure it starts with "curl".'); return; }
+    setUrl(parsed.url);
+    setMethod(parsed.method);
+    if (parsed.headers.length > 0) setHeaders((prev) => {
+      const existingKeys = new Set(parsed.headers.map((h) => h.key.toLowerCase()));
+      const kept = prev.filter((h) => !existingKeys.has(h.key.toLowerCase()));
+      return [...parsed.headers, ...kept];
+    });
+    if (parsed.body) { setBody(parsed.body); setBodyType(parsed.bodyType); }
+    setCurlInput('');
+    setCurlError('');
+    setCurlOpen(false);
+  }, [curlInput, setUrl]);
+
   const copyBody = () => {
     if (response?.body) {
       navigator.clipboard.writeText(response.body);
@@ -402,7 +506,13 @@ export function ApiTesterPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setHistoryOpen((o) => !o)}
+            onClick={() => { setCurlOpen((o) => !o); setHistoryOpen(false); }}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            <Terminal size={12} /> Import cURL
+          </button>
+          <button
+            onClick={() => { setHistoryOpen((o) => !o); setCurlOpen(false); }}
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-slate-200 transition-colors"
           >
             <Clock size={12} />
@@ -465,6 +575,52 @@ export function ApiTesterPage() {
                   ))}
                 </div>
               )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* cURL import panel                                                   */}
+      {/* ------------------------------------------------------------------ */}
+      <AnimatePresence>
+        {curlOpen && (
+          <motion.div
+            key="curl-panel"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden flex-shrink-0"
+          >
+            <div className="glass-card p-3 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                  <Terminal size={12} className="text-cyan-400" /> Paste cURL command
+                </p>
+                <button onClick={() => setCurlOpen(false)} className="text-slate-600 hover:text-slate-300 transition-colors">
+                  <X size={14} />
+                </button>
+              </div>
+              <textarea
+                value={curlInput}
+                onChange={(e) => { setCurlInput(e.target.value); setCurlError(''); }}
+                placeholder={`curl -X POST https://api.example.com/users \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer token123" \\\n  -d '{"name":"Jane"}'`}
+                rows={4}
+                spellCheck={false}
+                className="w-full bg-slate-800/50 border border-slate-700/40 rounded-md text-xs font-mono text-slate-300 placeholder-slate-600 p-3 resize-none focus:outline-none focus:border-cyan-500/40 transition-colors leading-relaxed"
+              />
+              {curlError && <p className="text-xs text-red-400">{curlError}</p>}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={importCurl}
+                  disabled={!curlInput.trim()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/30 text-xs font-medium transition-colors disabled:opacity-40"
+                >
+                  <Terminal size={12} /> Import
+                </button>
+                <p className="text-[10px] text-slate-600">Fields will be auto-populated from the cURL command</p>
+              </div>
             </div>
           </motion.div>
         )}
@@ -757,18 +913,18 @@ export function ApiTesterPage() {
                     {formatBytes(response.sizeBytes)}
                   </span>
                   <div className="ml-auto flex items-center gap-0.5">
-                    {(['body', 'headers'] as ResponseTab[]).map((t) => (
+                    {(['body', 'headers', 'preview'] as ResponseTab[]).map((t) => (
                       <button
                         key={t}
                         onClick={() => setResTab(t)}
                         className={clsx(
-                          'px-3 py-1 text-xs capitalize rounded-md transition-colors',
+                          'px-3 py-1 text-xs capitalize rounded-md transition-colors flex items-center gap-1',
                           resTab === t
                             ? 'bg-cyan-500/20 border border-cyan-500/30 text-cyan-300'
                             : 'text-slate-500 hover:text-slate-300'
                         )}
                       >
-                        {t}
+                        {t === 'preview' && <Eye size={10} />}{t}
                       </button>
                     ))}
                   </div>
@@ -815,6 +971,26 @@ export function ApiTesterPage() {
                           </div>
                         ))}
                       </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Preview tab */}
+                {resTab === 'preview' && (
+                  <div className="flex-1 flex flex-col min-h-0">
+                    {response.isJson ? (
+                      <div className="flex-1 overflow-auto p-3">
+                        <pre className="text-xs font-mono text-slate-300 leading-relaxed whitespace-pre-wrap break-all">
+                          {response.body}
+                        </pre>
+                      </div>
+                    ) : (
+                      <iframe
+                        srcDoc={response.body}
+                        sandbox="allow-scripts"
+                        className="flex-1 w-full border-0 bg-white rounded-b-lg"
+                        title="Response Preview"
+                      />
                     )}
                   </div>
                 )}
