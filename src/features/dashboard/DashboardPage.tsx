@@ -370,11 +370,11 @@ function AboutSection() {
 
                 <div className="flex-1 min-w-0">
                   <h3 className="text-base font-bold text-white">{member.name}</h3>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <Briefcase size={11} className="text-slate-500 flex-shrink-0" />
-                    <p className={clsx('text-xs font-medium truncate', member.accent)}>{member.role}</p>
+                  <div className="flex items-start gap-1.5 mt-0.5">
+                    <Briefcase size={11} className="text-slate-500 flex-shrink-0 mt-0.5" />
+                    <p className={clsx('text-xs font-medium leading-snug', member.accent)}>{member.role}</p>
                   </div>
-                  <p className="text-xs text-slate-600 truncate">{member.company}</p>
+                  <p className="text-xs text-slate-600">{member.company}</p>
                 </div>
               </div>
 
