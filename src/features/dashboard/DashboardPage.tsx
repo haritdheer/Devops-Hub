@@ -516,7 +516,7 @@ export function DashboardPage() {
 
       {/* Animated stat cards with count-up */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Tools"  target={10} icon={Zap}       color="text-cyan-400"   bg="bg-cyan-500/10"   delay={0}    />
+        <StatCard label="Total Tools"  target={11} icon={Zap}       color="text-cyan-400"   bg="bg-cyan-500/10"   delay={0}    />
         <StatCard label="Categories"   target={4}  icon={Shield}    color="text-violet-400" bg="bg-violet-500/10" delay={0.08} />
         <StatCard label="Parsers"      target={8}  icon={TrendingUp} color="text-green-400"  bg="bg-green-500/10"  delay={0.16} />
         <StatCard label="Always Free"  target={0}  suffix="∞" icon={Clock} color="text-blue-400" bg="bg-blue-500/10" delay={0.24} />
