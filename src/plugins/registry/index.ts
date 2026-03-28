@@ -132,6 +132,19 @@ export const toolRegistry: ToolPlugin[] = [
     color: 'text-red-400',
     gradient: 'from-red-500/20 to-orange-500/20',
   },
+  {
+    id: 'api-tester',
+    name: 'API Tester',
+    description: 'Test REST APIs with headers, body, auth, params and inspect responses',
+    route: '/tools/api-tester',
+    icon: 'Zap',
+    category: 'inspection',
+    tags: ['api', 'rest', 'http', 'postman', 'request', 'testing'],
+    persistenceKey: 'tool_api_tester',
+    featured: true,
+    color: 'text-cyan-400',
+    gradient: 'from-cyan-500/20 to-blue-500/20',
+  },
 ];
 
 export const getFeaturedTools = () => toolRegistry.filter((t) => t.featured);

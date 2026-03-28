@@ -11,6 +11,7 @@ import { K8sInspectorPage } from '../../features/tools/k8s-inspector/K8sInspecto
 import { EnvDiffPage } from '../../features/tools/env-diff/EnvDiffPage';
 import { LogAnalyzerPage } from '../../features/tools/log-analyzer/LogAnalyzerPage';
 import { CurlConverterPage } from '../../features/tools/curl-converter/CurlConverterPage';
+import { ApiTesterPage } from '../../features/tools/api-tester/ApiTesterPage';
 import { SnippetsPage } from '../../features/snippets/SnippetsPage';
 import { SettingsPage } from '../../features/settings/SettingsPage';
 
@@ -30,6 +31,7 @@ export const router = createBrowserRouter([
       { path: 'tools/env-diff', element: <EnvDiffPage /> },
       { path: 'tools/curl-converter', element: <CurlConverterPage /> },
       { path: 'tools/log-analyzer', element: <LogAnalyzerPage /> },
+      { path: 'tools/api-tester', element: <ApiTesterPage /> },
       { path: 'snippets', element: <SnippetsPage /> },
       { path: 'settings', element: <SettingsPage /> },
     ],

@@ -36,6 +36,7 @@ const iconMap: Record<string, React.ComponentType<{ size?: number; className?: s
   ScrollText,
   Bookmark,
   Settings,
+  Zap,
 };
 
 interface NavItem {
@@ -54,6 +55,7 @@ const navItems: NavItem[] = [
   { label: 'JSON Formatter', icon: 'Braces', path: '/tools/json-formatter', color: 'text-yellow-400' },
   { label: 'Divider', type: 'divider', heading: 'Inspection' },
   { label: 'JWT Decoder', icon: 'Key', path: '/tools/jwt-decoder', color: 'text-purple-400' },
+  { label: 'API Tester', icon: 'Zap', path: '/tools/api-tester', color: 'text-cyan-400' },
   { label: 'Docker Compose', icon: 'Container', path: '/tools/docker-compose', color: 'text-cyan-400' },
   { label: 'K8s Inspector', icon: 'Layers', path: '/tools/k8s-inspector', color: 'text-indigo-400' },
   { label: 'Divider', type: 'divider', heading: 'Analysis' },
