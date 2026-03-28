@@ -218,6 +218,98 @@ function parseCurl(cmd: string): ParsedCurl | null {
 }
 
 // ---------------------------------------------------------------------------
+// JSON Tree Viewer (DevTools-style collapsible)
+// ---------------------------------------------------------------------------
+
+interface JsonNodeProps {
+  data: unknown;
+  keyName?: string;
+  depth?: number;
+  defaultExpanded?: boolean;
+}
+
+function JsonNode({ data, keyName, depth = 0, defaultExpanded = true }: JsonNodeProps) {
+  const [open, setOpen] = useState(defaultExpanded && depth < 2);
+
+  const isObj = data !== null && typeof data === 'object' && !Array.isArray(data);
+  const isArr = Array.isArray(data);
+  const isExpandable = isObj || isArr;
+
+  const entries = isObj
+    ? Object.entries(data as Record<string, unknown>)
+    : isArr
+    ? (data as unknown[]).map((v, i) => [String(i), v] as [string, unknown])
+    : [];
+
+  const label = keyName !== undefined ? (
+    <span className="text-cyan-300/80 font-mono">{keyName}</span>
+  ) : null;
+
+  const colon = keyName !== undefined ? <span className="text-slate-600">: </span> : null;
+
+  // Primitive render
+  if (!isExpandable) {
+    let valueEl: React.ReactNode;
+    if (data === null) valueEl = <span className="text-slate-500 italic">null</span>;
+    else if (typeof data === 'boolean') valueEl = <span className="text-purple-400">{String(data)}</span>;
+    else if (typeof data === 'number') valueEl = <span className="text-yellow-300">{String(data)}</span>;
+    else valueEl = <span className="text-green-300">"{String(data)}"</span>;
+    return (
+      <div className="flex items-start leading-5" style={{ paddingLeft: depth * 16 }}>
+        {label}{colon}{valueEl}
+      </div>
+    );
+  }
+
+  const bracket = isArr ? ['[', `] (${entries.length})`] : ['{', '}'];
+  const preview = isArr
+    ? `Array(${entries.length})`
+    : `{${Object.keys(data as object).slice(0, 3).join(', ')}${Object.keys(data as object).length > 3 ? '…' : ''}}`;
+
+  return (
+    <div style={{ paddingLeft: depth * 16 }}>
+      <div
+        className="flex items-center gap-0.5 cursor-pointer select-none group leading-5"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className={clsx(
+          'text-slate-500 transition-transform duration-150 flex-shrink-0',
+          open ? 'rotate-90' : 'rotate-0'
+        )}>
+          ▶
+        </span>
+        {label}{colon}
+        <span className="text-slate-400 font-mono">{bracket[0]}</span>
+        {!open && (
+          <span className="text-slate-600 text-[11px] ml-1 italic">{preview}</span>
+        )}
+        {!open && <span className="text-slate-400 font-mono">{bracket[1]}</span>}
+      </div>
+      {open && (
+        <div>
+          {entries.map(([k, v]) => (
+            <JsonNode key={k} data={v} keyName={isArr ? undefined : k} depth={depth + 1} defaultExpanded={defaultExpanded} />
+          ))}
+          <div className="leading-5" style={{ paddingLeft: 0 }}>
+            <span className="text-slate-400 font-mono">{isArr ? ']' : '}'}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function JsonTreeViewer({ raw }: { raw: string }) {
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { return <pre className="text-xs font-mono text-slate-300 whitespace-pre-wrap break-all">{raw}</pre>; }
+  return (
+    <div className="text-xs font-mono text-slate-300 leading-5 p-3 overflow-auto">
+      <JsonNode data={parsed} defaultExpanded={true} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
@@ -977,18 +1069,14 @@ export function ApiTesterPage() {
 
                 {/* Preview tab */}
                 {resTab === 'preview' && (
-                  <div className="flex-1 flex flex-col min-h-0">
+                  <div className="flex-1 overflow-auto min-h-0">
                     {response.isJson ? (
-                      <div className="flex-1 overflow-auto p-3">
-                        <pre className="text-xs font-mono text-slate-300 leading-relaxed whitespace-pre-wrap break-all">
-                          {response.body}
-                        </pre>
-                      </div>
+                      <JsonTreeViewer raw={response.body} />
                     ) : (
                       <iframe
                         srcDoc={response.body}
                         sandbox="allow-scripts"
-                        className="flex-1 w-full border-0 bg-white rounded-b-lg"
+                        className="w-full h-full border-0 bg-white rounded-b-lg"
                         title="Response Preview"
                       />
                     )}
