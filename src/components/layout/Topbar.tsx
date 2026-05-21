@@ -1,4 +1,5 @@
-import { Search, Command, Menu } from 'lucide-react';
+import { Search, Command, Menu, Users } from 'lucide-react';
+import { useVisitorCount } from '../../hooks/useVisitorCount';
 
 interface TopbarProps {
   title?: string;
@@ -8,6 +9,8 @@ interface TopbarProps {
 }
 
 export function Topbar({ title, subtitle, onSearchClick, onMenuClick }: TopbarProps) {
+  const visitorCount = useVisitorCount();
+
   return (
     <header className="h-14 flex items-center justify-between px-4 border-b border-slate-700/50 bg-slate-900/40 backdrop-blur-sm flex-shrink-0 gap-3">
       <div className="flex items-center gap-3 min-w-0">
@@ -24,6 +27,19 @@ export function Topbar({ title, subtitle, onSearchClick, onMenuClick }: TopbarPr
         </div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700/50 text-slate-400 text-xs">
+          <Users size={13} />
+          {visitorCount.loading ? (
+            <span className="w-8 h-3 rounded bg-slate-700 animate-pulse" />
+          ) : visitorCount.count !== null ? (
+            <>
+              <span className="text-slate-200 font-medium">{visitorCount.count.toLocaleString()}</span>
+              <span className="text-slate-500">visitors</span>
+            </>
+          ) : (
+            <span className="text-slate-500">visitors</span>
+          )}
+        </div>
         <button
           onClick={onSearchClick}
           className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-slate-200 text-xs transition-colors"
