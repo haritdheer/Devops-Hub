@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useDeferredValue, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Layers, AlertTriangle, CheckCircle2, RotateCcw,
-  Globe, Box,
+  Globe, Box, Upload, Loader2,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { parseK8sManifest } from '../../../lib/parsers/k8s';
 import type { K8sResource } from '../../../lib/parsers/k8s';
 
 const STORAGE_KEY = 'tool_k8s_inspector';
+const MAX_PERSIST_BYTES = 150_000;
 
 const DEFAULT_MANIFEST = `apiVersion: apps/v1
 kind: Deployment
@@ -75,14 +76,14 @@ spec:
           image: envoyproxy/envoy:v1.25`;
 
 const KIND_COLORS: Record<string, string> = {
-  Deployment: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+  Deployment:  'text-blue-400 bg-blue-500/10 border-blue-500/20',
   StatefulSet: 'text-violet-400 bg-violet-500/10 border-violet-500/20',
-  DaemonSet: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
-  Service: 'text-green-400 bg-green-500/10 border-green-500/20',
-  ConfigMap: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
-  Secret: 'text-red-400 bg-red-500/10 border-red-500/20',
-  Pod: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
-  Ingress: 'text-pink-400 bg-pink-500/10 border-pink-500/20',
+  DaemonSet:   'text-orange-400 bg-orange-500/10 border-orange-500/20',
+  Service:     'text-green-400 bg-green-500/10 border-green-500/20',
+  ConfigMap:   'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
+  Secret:      'text-red-400 bg-red-500/10 border-red-500/20',
+  Pod:         'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
+  Ingress:     'text-pink-400 bg-pink-500/10 border-pink-500/20',
 };
 
 function ResourceCard({ resource }: { resource: K8sResource }) {
@@ -101,13 +102,10 @@ function ResourceCard({ resource }: { resource: K8sResource }) {
             )}
           </div>
           <p className="text-sm font-semibold text-white">{resource.name}</p>
-          {resource.namespace && (
-            <p className="text-xs text-slate-500">ns: {resource.namespace}</p>
-          )}
+          {resource.namespace && <p className="text-xs text-slate-500">ns: {resource.namespace}</p>}
         </div>
       </div>
 
-      {/* Deployment/StatefulSet specifics */}
       {resource.replicas !== undefined && (
         <div className="flex items-center gap-2 text-xs">
           <Box size={11} className="text-slate-500" />
@@ -135,7 +133,6 @@ function ResourceCard({ resource }: { resource: K8sResource }) {
         </div>
       )}
 
-      {/* Service specifics */}
       {resource.serviceType && (
         <div className="flex items-center gap-2 text-xs">
           <Globe size={11} className="text-slate-500" />
@@ -153,13 +150,10 @@ function ResourceCard({ resource }: { resource: K8sResource }) {
         </div>
       )}
 
-      {/* Labels */}
       {resource.labels && Object.keys(resource.labels).length > 0 && (
         <div className="flex flex-wrap gap-1">
           {Object.entries(resource.labels).slice(0, 4).map(([k, v]) => (
-            <span key={k} className="text-xs px-1.5 py-0.5 rounded bg-slate-800/80 text-slate-600 font-mono">
-              {k}={v}
-            </span>
+            <span key={k} className="text-xs px-1.5 py-0.5 rounded bg-slate-800/80 text-slate-600 font-mono">{k}={v}</span>
           ))}
         </div>
       )}
@@ -168,24 +162,62 @@ function ResourceCard({ resource }: { resource: K8sResource }) {
 }
 
 export function K8sInspectorPage() {
-  const [input, setInput] = useState(() => localStorage.getItem(STORAGE_KEY) || DEFAULT_MANIFEST);
-  const [result, setResult] = useState(() => parseK8sManifest(localStorage.getItem(STORAGE_KEY) || DEFAULT_MANIFEST));
-  const [_copied, _setCopied] = useState(false);
+  const [input, setInput] = useState<string>(() => {
+    try { return localStorage.getItem(STORAGE_KEY) || DEFAULT_MANIFEST; } catch { return DEFAULT_MANIFEST; }
+  });
+  const [fileName, setFileName] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, input); }, [input]);
+  // Skip localStorage writes for large manifests — setItem is synchronous and blocks
+  useEffect(() => {
+    if (input.length <= MAX_PERSIST_BYTES) {
+      try { localStorage.setItem(STORAGE_KEY, input); } catch {}
+    }
+  }, [input]);
 
-  const handleInput = (val: string) => { setInput(val); setResult(parseK8sManifest(val)); };
+  // Defer parsing so the textarea stays responsive during fast typing/pasting
+  const deferredInput = useDeferredValue(input);
+  const isAnalyzing   = deferredInput !== input;
+  const result        = parseK8sManifest(deferredInput);
+
+  const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = ev => setInput((ev.target?.result as string) ?? '');
+    reader.readAsText(file);
+    e.target.value = '';
+  }, []);
+
+  const lineCount = input.split('\n').length;
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-700/50 bg-slate-900/30">
-        <button onClick={() => handleInput(DEFAULT_MANIFEST)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700/60 border border-slate-700/50 text-slate-400 text-xs font-medium hover:text-slate-200 hover:bg-slate-700 transition-colors">
-          <Layers size={13} /> Load Example
+      {/* Toolbar */}
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-700/50 bg-slate-900/30 flex-wrap">
+        <input ref={fileRef} type="file" accept=".yml,.yaml,.json" className="hidden" onChange={handleFile} />
+        <button
+          onClick={() => fileRef.current?.click()}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700/60 border border-slate-700/50 text-slate-400 text-xs font-medium hover:text-slate-200 hover:bg-slate-700 transition-colors"
+        >
+          <Upload size={13} /> Upload
         </button>
-        <button onClick={() => { setInput(''); setResult(parseK8sManifest('')); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700/60 border border-slate-700/50 text-slate-400 text-xs font-medium hover:text-slate-200 hover:bg-slate-700 transition-colors">
+        <button
+          onClick={() => { setInput(DEFAULT_MANIFEST); setFileName(null); }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700/60 border border-slate-700/50 text-slate-400 text-xs font-medium hover:text-slate-200 hover:bg-slate-700 transition-colors"
+        >
+          <Layers size={13} /> Example
+        </button>
+        <button
+          onClick={() => { setInput(''); setFileName(null); }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700/60 border border-slate-700/50 text-slate-400 text-xs font-medium hover:text-slate-200 hover:bg-slate-700 transition-colors"
+        >
           <RotateCcw size={13} /> Clear
         </button>
+
         <div className="ml-auto flex items-center gap-2">
+          {isAnalyzing && <Loader2 size={12} className="animate-spin text-slate-500" />}
           {result.valid && result.stats && (
             <span className="text-xs text-slate-500">{result.stats.total} resource{result.stats.total !== 1 ? 's' : ''}</span>
           )}
@@ -202,25 +234,28 @@ export function K8sInspectorPage() {
       </div>
 
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+        {/* Left: Input */}
         <div className="flex flex-col md:w-2/5 h-48 md:h-auto border-b border-r-0 md:border-r md:border-b-0 border-slate-700/50">
-          <div className="px-4 py-2 border-b border-slate-700/30 flex items-center justify-between">
-            <span className="text-xs text-slate-500 font-medium">manifest.yaml</span>
-            <span className="text-xs text-slate-600">{input.split('\n').length} lines</span>
+          <div className="px-4 py-2 border-b border-slate-700/30 flex items-center justify-between gap-2">
+            <span className="text-xs text-slate-500 font-medium truncate" title={fileName ?? undefined}>
+              {fileName ?? 'manifest.yaml'}
+            </span>
+            <span className="text-xs text-slate-600 flex-shrink-0">{lineCount.toLocaleString()} lines</span>
           </div>
           <textarea
             value={input}
-            onChange={(e) => handleInput(e.target.value)}
+            onChange={e => setInput(e.target.value)}
             spellCheck={false}
             className="flex-1 w-full bg-slate-950/50 text-slate-200 text-xs font-mono p-4 resize-none outline-none leading-relaxed"
-            placeholder="Paste Kubernetes manifest YAML here (supports multiple --- separated resources)..."
+            placeholder="Paste Kubernetes manifest YAML here (supports multiple --- separated resources), or upload a file…"
           />
         </div>
 
+        {/* Right: Parsed output */}
         <div className="flex-1 overflow-auto">
           <AnimatePresence mode="wait">
             {result.valid && result.resources && (
               <motion.div key="valid" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 space-y-4">
-                {/* Kind summary */}
                 {result.stats && (
                   <div className="flex flex-wrap gap-2">
                     {Object.entries(result.stats.kinds).map(([kind, count]) => {
@@ -233,7 +268,6 @@ export function K8sInspectorPage() {
                     })}
                   </div>
                 )}
-
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                   {result.resources.map((resource, i) => (
                     <motion.div

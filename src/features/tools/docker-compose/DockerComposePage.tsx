@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useDeferredValue, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Container, AlertTriangle, CheckCircle2, Copy,
   RotateCcw, Server, Globe, HardDrive,
-  ArrowRight, Package,
+  ArrowRight, Package, Upload, Loader2,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { parseDockerCompose } from '../../../lib/parsers/docker-compose';
 import type { DockerComposeResult, DockerService } from '../../../lib/parsers/docker-compose';
 
 const STORAGE_KEY = 'tool_docker_compose';
+const MAX_PERSIST_BYTES = 150_000;
 
 const DEFAULT_COMPOSE = `version: '3.8'
 services:
@@ -73,7 +74,6 @@ function ServiceCard({ service }: { service: DockerService }) {
 
   return (
     <div className="glass-card p-4 space-y-3">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-cyan-500/15 border border-cyan-500/20 flex items-center justify-center">
@@ -88,7 +88,6 @@ function ServiceCard({ service }: { service: DockerService }) {
         )}
       </div>
 
-      {/* Image or build */}
       {service.image && (
         <div className="flex items-center gap-2">
           <Package size={12} className="text-slate-500" />
@@ -104,28 +103,20 @@ function ServiceCard({ service }: { service: DockerService }) {
         </div>
       )}
 
-      {/* Ports */}
       {service.ports && service.ports.length > 0 && (
         <div>
-          <p className="text-xs text-slate-600 mb-1.5 flex items-center gap-1">
-            <Globe size={10} /> Ports
-          </p>
+          <p className="text-xs text-slate-600 mb-1.5 flex items-center gap-1"><Globe size={10} /> Ports</p>
           <div className="flex flex-wrap gap-1.5">
             {service.ports.map((p) => (
-              <span key={p} className="text-xs font-mono px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400">
-                {p}
-              </span>
+              <span key={p} className="text-xs font-mono px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400">{p}</span>
             ))}
           </div>
         </div>
       )}
 
-      {/* Volumes */}
       {service.volumes && service.volumes.length > 0 && (
         <div>
-          <p className="text-xs text-slate-600 mb-1.5 flex items-center gap-1">
-            <HardDrive size={10} /> Volumes ({service.volumes.length})
-          </p>
+          <p className="text-xs text-slate-600 mb-1.5 flex items-center gap-1"><HardDrive size={10} /> Volumes ({service.volumes.length})</p>
           <div className="space-y-1">
             {service.volumes.map((v) => (
               <div key={v} className="text-xs font-mono text-slate-500 flex items-center gap-1">
@@ -136,7 +127,6 @@ function ServiceCard({ service }: { service: DockerService }) {
         </div>
       )}
 
-      {/* Env vars count */}
       {envCount > 0 && (
         <div className="flex items-center gap-2 text-xs text-slate-500">
           <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700/40">
@@ -145,14 +135,11 @@ function ServiceCard({ service }: { service: DockerService }) {
         </div>
       )}
 
-      {/* Depends on */}
       {service.depends_on && service.depends_on.length > 0 && (
         <div className="flex flex-wrap gap-1.5 items-center">
           <span className="text-xs text-slate-600">depends on:</span>
           {service.depends_on.map((dep) => (
-            <span key={dep} className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-500 border border-slate-700/40">
-              {dep}
-            </span>
+            <span key={dep} className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-500 border border-slate-700/40">{dep}</span>
           ))}
         </div>
       )}
@@ -161,13 +148,34 @@ function ServiceCard({ service }: { service: DockerService }) {
 }
 
 export function DockerComposePage() {
-  const [input, setInput] = useState(() => localStorage.getItem(STORAGE_KEY) || DEFAULT_COMPOSE);
-  const [result, setResult] = useState<DockerComposeResult>(() => parseDockerCompose(localStorage.getItem(STORAGE_KEY) || DEFAULT_COMPOSE));
-  const [copied, setCopied] = useState(false);
+  const [input, setInput] = useState<string>(() => {
+    try { return localStorage.getItem(STORAGE_KEY) || DEFAULT_COMPOSE; } catch { return DEFAULT_COMPOSE; }
+  });
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [copied, setCopied]     = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, input); }, [input]);
+  // Skip localStorage writes for large files — setItem is synchronous and blocks
+  useEffect(() => {
+    if (input.length <= MAX_PERSIST_BYTES) {
+      try { localStorage.setItem(STORAGE_KEY, input); } catch {}
+    }
+  }, [input]);
 
-  const handleInput = (val: string) => { setInput(val); setResult(parseDockerCompose(val)); };
+  // Defer the expensive parse so the textarea stays responsive during fast typing/pasting
+  const deferredInput = useDeferredValue(input);
+  const isAnalyzing   = deferredInput !== input;
+  const result        = parseDockerCompose(deferredInput) as DockerComposeResult;
+
+  const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = ev => setInput((ev.target?.result as string) ?? '');
+    reader.readAsText(file);
+    e.target.value = '';
+  }, []);
 
   const copy = () => {
     navigator.clipboard.writeText(input);
@@ -178,14 +186,29 @@ export function DockerComposePage() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-700/50 bg-slate-900/30">
-        <button onClick={() => handleInput(DEFAULT_COMPOSE)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700/60 border border-slate-700/50 text-slate-400 text-xs font-medium hover:text-slate-200 hover:bg-slate-700 transition-colors">
-          <Container size={13} /> Load Example
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-700/50 bg-slate-900/30 flex-wrap">
+        <input ref={fileRef} type="file" accept=".yml,.yaml,.json" className="hidden" onChange={handleFile} />
+        <button
+          onClick={() => fileRef.current?.click()}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700/60 border border-slate-700/50 text-slate-400 text-xs font-medium hover:text-slate-200 hover:bg-slate-700 transition-colors"
+        >
+          <Upload size={13} /> Upload
         </button>
-        <button onClick={() => { setInput(''); setResult(parseDockerCompose('')); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700/60 border border-slate-700/50 text-slate-400 text-xs font-medium hover:text-slate-200 hover:bg-slate-700 transition-colors">
+        <button
+          onClick={() => { setInput(DEFAULT_COMPOSE); setFileName(null); }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700/60 border border-slate-700/50 text-slate-400 text-xs font-medium hover:text-slate-200 hover:bg-slate-700 transition-colors"
+        >
+          <Container size={13} /> Example
+        </button>
+        <button
+          onClick={() => { setInput(''); setFileName(null); }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700/60 border border-slate-700/50 text-slate-400 text-xs font-medium hover:text-slate-200 hover:bg-slate-700 transition-colors"
+        >
           <RotateCcw size={13} /> Clear
         </button>
-        <div className="ml-auto">
+
+        <div className="ml-auto flex items-center gap-2">
+          {isAnalyzing && <Loader2 size={12} className="animate-spin text-slate-500" />}
           {result.valid ? (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/15 border border-green-500/25 text-green-400 text-xs font-semibold">
               <CheckCircle2 size={12} /> Valid
@@ -201,18 +224,20 @@ export function DockerComposePage() {
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
         {/* Left: Input */}
         <div className="flex flex-col md:w-2/5 h-48 md:h-auto border-b border-r-0 md:border-r md:border-b-0 border-slate-700/50">
-          <div className="px-4 py-2 border-b border-slate-700/30 flex items-center justify-between">
-            <span className="text-xs text-slate-500 font-medium">docker-compose.yml</span>
-            <button onClick={copy} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors">
+          <div className="px-4 py-2 border-b border-slate-700/30 flex items-center justify-between gap-2">
+            <span className="text-xs text-slate-500 font-medium truncate" title={fileName ?? undefined}>
+              {fileName ?? 'docker-compose.yml'}
+            </span>
+            <button onClick={copy} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors flex-shrink-0">
               <Copy size={11} /> {copied ? 'Copied!' : 'Copy'}
             </button>
           </div>
           <textarea
             value={input}
-            onChange={(e) => handleInput(e.target.value)}
+            onChange={e => setInput(e.target.value)}
             spellCheck={false}
             className="flex-1 w-full bg-slate-950/50 text-slate-200 text-xs font-mono p-4 resize-none outline-none leading-relaxed"
-            placeholder="Paste docker-compose.yml here..."
+            placeholder="Paste docker-compose.yml here, or upload a file…"
           />
         </div>
 
@@ -221,13 +246,12 @@ export function DockerComposePage() {
           <AnimatePresence mode="wait">
             {result.valid && result.services && (
               <motion.div key="valid" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 space-y-4">
-                {/* Stats */}
                 {result.stats && (
                   <div className="grid grid-cols-4 gap-3">
                     {[
                       { label: 'Services', value: result.stats.serviceCount, color: 'text-cyan-400' },
-                      { label: 'Ports', value: result.stats.portCount, color: 'text-blue-400' },
-                      { label: 'Volumes', value: result.stats.volumeCount, color: 'text-violet-400' },
+                      { label: 'Ports',    value: result.stats.portCount,    color: 'text-blue-400' },
+                      { label: 'Volumes',  value: result.stats.volumeCount,  color: 'text-violet-400' },
                       { label: 'Networks', value: result.stats.networkCount, color: 'text-green-400' },
                     ].map(({ label, value, color }) => (
                       <div key={label} className="glass-card p-3 text-center">
@@ -237,24 +261,15 @@ export function DockerComposePage() {
                     ))}
                   </div>
                 )}
-
-                {/* Version */}
                 {result.version && (
                   <div className="flex items-center gap-2 text-xs text-slate-500">
                     <span>Compose version:</span>
                     <span className="font-mono text-slate-400">{result.version}</span>
                   </div>
                 )}
-
-                {/* Service cards */}
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                   {result.services.map((service, i) => (
-                    <motion.div
-                      key={service.name}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                    >
+                    <motion.div key={service.name} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
                       <ServiceCard service={service} />
                     </motion.div>
                   ))}
