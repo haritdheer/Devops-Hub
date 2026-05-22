@@ -9,11 +9,9 @@ export function useVisitorCount() {
   useEffect(() => {
     const hasVisited = localStorage.getItem(LOCAL_KEY);
 
-    const url = hasVisited
-      ? 'https://api.counterapi.dev/v1/devops-utility-hub/visitors'
-      : 'https://api.counterapi.dev/v1/devops-utility-hub/visitors/up';
-
-    fetch(url)
+    fetch('/api/visitors', {
+      method: hasVisited ? 'GET' : 'POST',
+    })
       .then(r => r.json())
       .then(data => {
         if (typeof data.count === 'number') {
