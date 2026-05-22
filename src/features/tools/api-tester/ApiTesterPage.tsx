@@ -18,10 +18,14 @@ import {
   Terminal,
   Eye,
   X,
+  FolderOpen,
+  FolderX,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { ToolShell } from '../../../components/common/ToolShell';
 import { useToolPersistence } from '../../../hooks/useToolPersistence';
+import { parseWorkspace } from '../../../lib/parsers/workspace';
+import type { WorkspaceTab, WorkspaceMeta } from '../../../lib/parsers/workspace';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -425,6 +429,99 @@ export function ApiTesterPage() {
 
   const abortRef = useRef<AbortController | null>(null);
 
+  // ── Workspace tabs ────────────────────────────────────────────────────────
+  const [tabs, setTabs]             = useState<WorkspaceTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [workspace, setWorkspace]   = useState<WorkspaceMeta | null>(null);
+  const [importError, setImportError] = useState('');
+  const tabsRef = useRef<WorkspaceTab[]>([]);
+  tabsRef.current = tabs;
+  const workspaceFileRef = useRef<HTMLInputElement>(null);
+
+  // Load new tab's state into form whenever activeTabId changes
+  useEffect(() => {
+    if (!activeTabId) return;
+    const tab = tabsRef.current.find(t => t.id === activeTabId);
+    if (!tab) return;
+    setUrl(tab.url);
+    setMethod(tab.method);
+    setParams(tab.params);
+    setHeaders(tab.headers);
+    setBody(tab.body);
+    setBodyType(tab.bodyType);
+    setAuth(tab.auth);
+    setResponse(null);
+    setResponseError(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTabId]);
+
+  const saveCurrentToTab = useCallback(() => {
+    if (!activeTabId) return;
+    setTabs(prev => prev.map(t =>
+      t.id === activeTabId ? { ...t, url, method, params, headers, body, bodyType, auth } : t
+    ));
+  }, [activeTabId, url, method, params, headers, body, bodyType, auth]);
+
+  const switchToTab = useCallback((newTabId: string) => {
+    saveCurrentToTab();
+    setActiveTabId(newTabId);
+  }, [saveCurrentToTab]);
+
+  const closeTab = useCallback((tabId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const remaining = tabsRef.current.filter(t => t.id !== tabId);
+    setTabs(remaining);
+    if (activeTabId === tabId) {
+      const idx     = tabsRef.current.findIndex(t => t.id === tabId);
+      const next    = remaining[idx] ?? remaining[idx - 1];
+      setActiveTabId(next?.id ?? null);
+      if (!next) setWorkspace(null);
+    }
+  }, [activeTabId]);
+
+  const addNewTab = useCallback(() => {
+    saveCurrentToTab();
+    const newTab: WorkspaceTab = {
+      id: uid(), name: 'New Request', url: '', method: 'GET',
+      params: [], headers: [...DEFAULT_HEADERS],
+      body: '{\n  \n}', bodyType: 'json',
+      auth: { type: 'none', token: '', username: '', password: '' },
+    };
+    setTabs(prev => [...prev, newTab]);
+    setActiveTabId(newTab.id);
+  }, [saveCurrentToTab]);
+
+  const clearWorkspace = useCallback(() => {
+    setTabs([]);
+    setActiveTabId(null);
+    setWorkspace(null);
+    setImportError('');
+  }, []);
+
+  const handleWorkspaceFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportError('');
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      // Parse in a macrotask so the file-picker UI clears first
+      setTimeout(() => {
+        try {
+          const json = JSON.parse((ev.target?.result as string) ?? '');
+          const { tabs: parsed, meta } = parseWorkspace(json);
+          if (!parsed.length) { setImportError('No requests found in the file.'); return; }
+          setTabs(parsed);
+          setWorkspace(meta);
+          setActiveTabId(parsed[0].id);
+        } catch (err) {
+          setImportError(err instanceof Error ? err.message : 'Failed to parse workspace file.');
+        }
+      }, 0);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }, []);
+
   const restoreHistory = useCallback((entry: HistoryEntry) => {
     setUrl(entry.url);
     setMethod(entry.method);
@@ -597,6 +694,20 @@ export function ApiTesterPage() {
           <span className="text-xs text-slate-600 hidden sm:inline">Postman-style HTTP client</span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Hidden workspace file input */}
+          <input
+            ref={workspaceFileRef}
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={handleWorkspaceFile}
+          />
+          <button
+            onClick={() => { workspaceFileRef.current?.click(); setHistoryOpen(false); setCurlOpen(false); }}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            <FolderOpen size={12} /> Import Workspace
+          </button>
           <button
             onClick={() => { setCurlOpen((o) => !o); setHistoryOpen(false); }}
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-slate-200 transition-colors"
@@ -618,6 +729,84 @@ export function ApiTesterPage() {
           </button>
         </div>
       </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Import error                                                        */}
+      {/* ------------------------------------------------------------------ */}
+      {importError && (
+        <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400 flex-shrink-0">
+          <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
+          <span className="flex-1">{importError}</span>
+          <button onClick={() => setImportError('')} className="flex-shrink-0 hover:text-red-200"><X size={12} /></button>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Workspace tab bar — visible only when a workspace is loaded         */}
+      {/* ------------------------------------------------------------------ */}
+      {tabs.length > 0 && (
+        <div className="flex-shrink-0 flex flex-col gap-1">
+          {/* Collection label + clear */}
+          <div className="flex items-center gap-2">
+            <FolderOpen size={11} className="text-cyan-500 flex-shrink-0" />
+            <span className="text-[11px] text-cyan-400 font-medium truncate">
+              {workspace?.name ?? 'Workspace'}
+            </span>
+            <span className="text-[10px] text-slate-600">
+              {workspace?.source === 'postman' ? '· Postman' : workspace?.source === 'insomnia' ? '· Insomnia' : ''}
+              {' '}· {tabs.length} request{tabs.length !== 1 ? 's' : ''}
+            </span>
+            <button
+              onClick={clearWorkspace}
+              className="ml-auto flex items-center gap-1 text-[10px] text-slate-600 hover:text-red-400 transition-colors"
+            >
+              <FolderX size={11} /> Clear
+            </button>
+          </div>
+
+          {/* Scrollable tab strip */}
+          <div className="flex items-end gap-1 overflow-x-auto pb-0" style={{ scrollbarWidth: 'thin' }}>
+            {tabs.map(tab => {
+              const isActive = tab.id === activeTabId;
+              const mc = METHOD_COLORS[tab.method];
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => switchToTab(tab.id)}
+                  className={clsx(
+                    'flex items-center gap-1.5 px-2.5 py-1.5 rounded-t-lg border border-b-0 text-xs flex-shrink-0 max-w-[160px] transition-colors group',
+                    isActive
+                      ? 'bg-slate-800 border-slate-600 text-white'
+                      : 'bg-slate-900/60 border-slate-700/40 text-slate-500 hover:text-slate-300 hover:bg-slate-800/60'
+                  )}
+                >
+                  <span className={clsx('text-[9px] font-bold px-1 py-0.5 rounded border flex-shrink-0', mc)}>
+                    {tab.method}
+                  </span>
+                  <span className="truncate min-w-0 text-left">{tab.name}</span>
+                  <span
+                    onClick={(e) => closeTab(tab.id, e)}
+                    className="flex-shrink-0 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all ml-0.5 cursor-pointer"
+                  >
+                    <X size={10} />
+                  </span>
+                </button>
+              );
+            })}
+
+            {/* Add new tab */}
+            <button
+              onClick={addNewTab}
+              className="flex-shrink-0 flex items-center gap-1 px-2 py-1.5 rounded-t-lg border border-b-0 border-slate-700/40 text-slate-600 hover:text-slate-300 hover:bg-slate-800/60 text-xs transition-colors"
+            >
+              <Plus size={11} />
+            </button>
+          </div>
+
+          {/* Bottom border that connects with content below */}
+          <div className="-mt-px border-t border-slate-700/50" />
+        </div>
+      )}
 
       {/* ------------------------------------------------------------------ */}
       {/* History panel                                                       */}
